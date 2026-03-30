@@ -1,98 +1,354 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row mb-4 align-items-center">
+<div class="row align-items-center mb-4">
     <div class="col-md-8">
-        <h2 class="fw-bold" style="color: #0B3C86;">System Administrator & HR Portal</h2>
-        <p class="text-muted mb-0">Engine Room: System governance and database integrity.</p>
+        <h2 class="fw-bold text-primary mb-0" style="color: #0B3C86 !important;">System Administrator Portal</h2>
+        <p class="text-muted">Operations & Governance Engine Room</p>
     </div>
     <div class="col-md-4 text-md-end">
-        <button class="btn btn-outline-primary btn-sm me-2"><i class="bi bi-hdd-fill"></i> Backup Database</button>
-        <button class="btn btn-primary btn-sm">Open New Term</button>
+        <a href="{{ url_for('admin_backup_db') }}" class="btn btn-outline-primary shadow-sm"><i class="bi bi-hdd-fill"></i> Backup Database</a>
     </div>
 </div>
 
+<!-- MODULE 4: REAL-TIME ANALYTICS -->
 <div class="row mb-4">
     <div class="col-md-4">
         <div class="card shadow-sm border-0 border-start border-primary border-4">
             <div class="card-body">
-                <h6 class="text-muted fw-bold mb-1">User Connectivity</h6>
-                <h3 class="text-dark">24 <span class="fs-6 text-success">Active Sessions</span></h3>
+                <h6 class="text-muted fw-bold mb-1">Active Accounts</h6>
+                <h3 class="text-dark">{{ stats.active_users }} <span class="fs-6 text-success">Approved Users</span></h3>
             </div>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card shadow-sm border-0 border-start border-info border-4">
             <div class="card-body">
-                <h6 class="text-muted fw-bold mb-1">Storage Status (Evidence Repo)</h6>
-                <h3 class="text-dark">4.2 GB <span class="fs-6 text-muted">Used</span></h3>
+                <h6 class="text-muted fw-bold mb-1">Storage Status (Evidence)</h6>
+                <h3 class="text-dark">{{ stats.evidence_count }} <span class="fs-6 text-muted">Uploaded Files</span></h3>
             </div>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card shadow-sm border-0 border-start border-warning border-4">
             <div class="card-body">
-                <h6 class="text-muted fw-bold mb-1">Term Progress</h6>
-                <h3 class="text-dark">85 <span class="fs-6 text-muted">Days Remaining</span></h3>
+                <h6 class="text-muted fw-bold mb-1">Term Progress Target</h6>
+                <h3 class="text-dark">{{ stats.days_remaining }} <span class="fs-6 text-muted">Days Remaining</span></h3>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-12">
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white border-0 pt-4 pb-0">
-                <h5 class="fw-bold text-dark">User Registration Management (Verification Queue)</h5>
-            </div>
+<ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold" id="queue-tab" data-bs-toggle="tab" data-bs-target="#queue" type="button" role="tab">Verification Queue</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold" id="term-tab" data-bs-toggle="tab" data-bs-target="#term" type="button" role="tab">Term Configuration</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold" id="indicators-tab" data-bs-toggle="tab" data-bs-target="#indicators" type="button" role="tab">Master Indicators</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold text-danger" id="security-tab" data-bs-toggle="tab" data-bs-target="#security" type="button" role="tab">Security & Maintenance</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="adminTabsContent">
+
+    <!-- MODULE 1: VERIFICATION QUEUE -->
+    <div class="tab-pane fade show active" id="queue" role="tabpanel">
+        <div class="card shadow-sm border-0">
             <div class="card-body">
+                <h5 class="fw-bold mb-3 text-dark">User Lifecycle Management</h5>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>Employee ID</th>
+                                <th>HR ID</th>
                                 <th>Full Name</th>
-                                <th>Institutional Email</th>
+                                <th>Corporate Email</th>
                                 <th>Requested Role</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
+                            {% for user in pending_users %}
                             <tr>
-                                <td>2024-1045</td>
-                                <td>Juan Dela Cruz</td>
-                                <td>jdelacruz@neust.edu.ph</td>
-                                <td>Faculty Member</td>
-                                <td><span class="badge bg-warning text-dark">Pending</span></td>
+                                <td>{{ user[0] }}</td>
+                                <td>{{ user[1] }} {{ user[2] }}</td>
+                                <td>{{ user[3] }}</td>
+                                <td><span class="badge bg-secondary">{{ user[4] }}</span></td>
+                                <td><span class="badge bg-warning text-dark">PENDING</span></td>
                                 <td>
-                                    <button class="btn btn-success btn-sm me-1">Approve</button>
-                                    <button class="btn btn-outline-danger btn-sm">Reject</button>
+                                        <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#reviewModal{{ user[0] }}">
+                                            <i class="bi bi-eye-fill me-1"></i> Review Info
+                                        </button>
+
+                                        <!-- Review Modal -->
+                                        <div class="modal fade" id="reviewModal{{ user[0] }}" tabindex="-1" aria-labelledby="reviewModalLabel{{ user[0] }}" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered modal-lg">
+                                                <div class="modal-content border-0 shadow-lg">
+                                                    <div class="modal-header bg-light border-bottom-0">
+                                                        <h5 class="modal-title fw-bold text-primary" id="reviewModalLabel{{ user[0] }}">
+                                                            <i class="bi bi-person-lines-fill me-2"></i>Review Applicant Information
+                                                        </h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body p-4 text-start">
+                                                        <div class="row g-3">
+                                                            <div class="col-md-6">
+                                                                <p class="mb-1 text-muted small fw-bold">Full Name</p>
+                                                                <p class="mb-0 fs-6">{{ user[1] }} {{ user[2] }}</p>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <p class="mb-1 text-muted small fw-bold">Employee ID</p>
+                                                                <p class="mb-0 fs-6">{{ user[0] }}</p>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <p class="mb-1 text-muted small fw-bold">Corporate Email</p>
+                                                                <p class="mb-0 fs-6">{{ user[3] }}</p>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <p class="mb-1 text-muted small fw-bold">Requested Role</p>
+                                                                <p class="mb-0 fs-6"><span class="badge bg-secondary">{{ user[4] }}</span></p>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <p class="mb-1 text-muted small fw-bold">College</p>
+                                                                <p class="mb-0 fs-6">{{ user[5] }}</p>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <p class="mb-1 text-muted small fw-bold">Assigned Program</p>
+                                                                <p class="mb-0 fs-6">{{ user[8] }}</p>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <p class="mb-1 text-muted small fw-bold">Academic Rank</p>
+                                                                <p class="mb-0 fs-6">{{ user[6] }}</p>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <p class="mb-1 text-muted small fw-bold">Employment Status</p>
+                                                                <p class="mb-0 fs-6">{{ user[7] }}</p>
+                                                            </div>
+                                                            <div class="col-md-12">
+                                                                <p class="mb-1 text-muted small fw-bold">Designation</p>
+                                                                <p class="mb-0 fs-6">{{ user[9] }}</p>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div class="mt-4 pt-3 border-top p-3 rounded d-flex justify-content-end align-items-center" style="background-color: #f8f9fa;">
+                                                            <span class="text-muted small me-auto"><i class="bi bi-info-circle me-1"></i>Verify information before confirming.</span>
+                                                            <form action="{{ url_for('admin_verify_user') }}" method="POST" class="d-inline me-2">
+                                                                <input type="hidden" name="emp_id" value="{{ user[0] }}">
+                                                                <input type="hidden" name="action" value="reject">
+                                                                <button type="submit" class="btn btn-outline-danger px-4 rounded-pill fw-bold">Reject</button>
+                                                            </form>
+                                                            <form action="{{ url_for('admin_verify_user') }}" method="POST" class="d-inline">
+                                                                <input type="hidden" name="emp_id" value="{{ user[0] }}">
+                                                                <input type="hidden" name="action" value="approve">
+                                                                <button type="submit" class="btn btn-success px-4 shadow-sm rounded-pill fw-bold">Approve Registration</button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                 </td>
                             </tr>
+                            {% else %}
+                            <tr><td colspan="6" class="text-center text-muted py-4">No pending users in queue.</td></tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 text-center py-3 hover-card">
-            <h6 class="fw-bold text-primary mb-0">Academic Term Configuration</h6>
+    <!-- MODULE 2: TERM CONFIGURATION -->
+    <div class="tab-pane fade" id="term" role="tabpanel">
+        <div class="row">
+            <div class="col-md-5">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body">
+                        <h5 class="fw-bold text-dark mb-3">Open New Term</h5>
+                        <form action="{{ url_for('admin_open_term') }}" method="POST">
+                            <div class="mb-3">
+                                <label class="form-label text-muted fw-bold">Academic Year</label>
+                                <input type="text" name="academic_year" class="form-control" placeholder="e.g. 2026-2027" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted fw-bold">Semester</label>
+                                <select name="semester" class="form-select" required>
+                                    <option value="1st Semester">1st Semester</option>
+                                    <option value="2nd Semester">2nd Semester</option>
+                                    <option value="Midyear">Midyear</option>
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label text-muted fw-bold">Hard Deadline Date</label>
+                                <input type="date" name="deadline_date" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-bold">Initialize Term</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-7">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="fw-bold text-dark mb-3">Term History</h5>
+                        <table class="table table-sm table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Term ID</th>
+                                    <th>A.Y.</th>
+                                    <th>Semester</th>
+                                    <th>Deadline Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for term in terms %}
+                                <tr>
+                                    <td>{{ term[0] }}</td>
+                                    <td>{{ term[1] }}</td>
+                                    <td>{{ term[2] }}</td>
+                                    <td>{{ term[3] }}</td>
+                                    <td>
+                                        {% if term[4] %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Locked</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 text-center py-3 hover-card">
-            <h6 class="fw-bold text-success mb-0">Master Performance Indicators</h6>
+
+    <!-- MODULE 3: MASTER INDICATORS -->
+    <div class="tab-pane fade" id="indicators" role="tabpanel">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body">
+                        <h5 class="fw-bold text-success mb-3">Add Target Blueprint</h5>
+                        
+                        {% if not active_term %}
+                        <div class="alert alert-warning shadow-sm border-0 border-start border-warning border-4 text-dark rounded mb-0">
+                            <strong><i class="bi bi-exclamation-triangle-fill me-2"></i>Action Required</strong><br>
+                            <span class="small">Please open an Academic Term first.</span>
+                        </div>
+                        <fieldset disabled>
+                        {% else %}
+                        <div class="alert alert-info shadow-sm border-0 mb-3 small py-2 rounded">
+                            <strong><i class="bi bi-calendar-check me-1"></i>Active Term Target:</strong> {{ active_term[1] }} ({{ active_term[2] }})
+                        </div>
+                        <fieldset>
+                        {% endif %}
+                        
+                        <form action="{{ url_for('admin_add_indicator') }}" method="POST">
+                            {% if active_term %}
+                            <input type="hidden" name="term_id" value="{{ active_term[0] }}">
+                            {% endif %}
+                            <div class="mb-3 mt-2">
+                                <label class="form-label text-muted fw-bold small">OPCR Category</label>
+                                <select name="category_name" class="form-select" required>
+                                    <optgroup label="1. Strategic Priorities (50%)">
+                                        <option value="A. Instructions">A. Instructions</option>
+                                    </optgroup>
+                                    <optgroup label="2. Core Functions (40%)">
+                                        <option value="A. Research">A. Research</option>
+                                        <option value="B. Extension Services / Training / Advisory">B. Extension Services / Training / Advisory</option>
+                                    </optgroup>
+                                    <optgroup label="3. Support Functions (10%)">
+                                        <option value="Support Functions">Support Functions</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted fw-bold small">Indicator Description</label>
+                                <textarea name="description" class="form-control" rows="3" placeholder="Paste official PDF text here..." required></textarea>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label text-muted fw-bold small">Efficiency Grading Type</label>
+                                <select name="efficiency_type" class="form-select border-success" required>
+                                    <option value="Quantity-Based">Quantity-Based (Auto-Copied)</option>
+                                    <option value="Adjectival">Adjectival (Manager Graded)</option>
+                                    <option value="Client Satisfaction">Client Satisfaction (Survey)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100 fw-bold shadow-sm" {% if not active_term %}disabled{% endif %}>
+                                <i class="bi bi-lock-fill me-1"></i> Lock Target to Blueprint
+                            </button>
+                        </form>
+                        
+                        </fieldset>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="fw-bold text-dark mb-3">Locked Organization Targets</h5>
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-hover table-sm">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Category</th>
+                                        <th>Description</th>
+                                        <th>Efficiency Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ind in indicators %}
+                                    <tr>
+                                        <td>{{ ind[0] }}</td>
+                                        <td><span class="badge bg-primary">{{ ind[1] }}</span></td>
+                                        <td>{{ ind[2] }}</td>
+                                        <td><span class="badge bg-dark">{{ ind[3] }}</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 text-center py-3 hover-card">
-            <h6 class="fw-bold text-secondary mb-0">System Audit & Security Logs</h6>
+
+    <!-- MODULE 5: SECURITY -->
+    <div class="tab-pane fade" id="security" role="tabpanel">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 border-danger border-start border-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold text-danger mb-3">Emergency Password Reset</h5>
+                        <p class="text-muted small">Force overwrite a user's BCrypt hash in case of lockout.</p>
+                        <form action="{{ url_for('admin_reset_password') }}" method="POST">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Target HR ID</label>
+                                <input type="text" name="emp_id" class="form-control" placeholder="e.g. 2024-1045" required>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">New Temporary Password</label>
+                                <input type="text" name="new_password" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-danger w-100 fw-bold">Overwrite Password</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
 </div>
 {% endblock %}

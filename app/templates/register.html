@@ -1,37 +1,111 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accrual - Register</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-        .container { border: 1px solid #ccc; padding: 20px; width: 300px; margin: auto; border-radius: 10px; }
-        .status { color: red; font-weight: bold; margin-bottom: 20px;}
-        input { width: 90%; padding: 8px; border-radius: 5px; border: 1px solid #ccc; }
-        button { width: 95%; padding: 10px; border-radius: 5px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
-        button:hover { background-color: #45a049; }
-        a { text-decoration: none; color: #333; }
-        a:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <h3 class="fw-bold text-primary" style="color: #0B3C86 !important;">Create your Accrual Account</h3>
+                    <p class="text-muted">Register to access the Digital IPCR System</p>
+                </div>
 
-    <div class="container">
-        <h2>Accrual System - Register</h2>
+                <form action="{{ url_for('register') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label text-muted fw-bold">Employee ID (HR ID)</label>
+                        <input type="text" name="emp_id" class="form-control bg-light" placeholder="e.g. 2024-1045" required>
+                    </div>
 
-        <p class="status">{{ status }}</p>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted fw-bold">First Name</label>
+                            <input type="text" name="first_name" class="form-control bg-light" placeholder="Juan" required>
+                        </div>
+                        <div class="col-md-6 mt-3 mt-md-0">
+                            <label class="form-label text-muted fw-bold">Last Name</label>
+                            <input type="text" name="last_name" class="form-control bg-light" placeholder="Dela Cruz" required>
+                        </div>
+                    </div>
 
-        <form action="{{ url_for('register') }}" method="POST">
-            <input type="number" name="emp_id" placeholder="Employee ID" required><br><br>
-            <input type="email" name="email" placeholder="Corporate Email" required><br><br>
-            <input type="password" name="password" placeholder="Password" required><br><br>
-            <button type="submit">Register</button>
-        </form>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted fw-bold">College</label>
+                            <select name="college" class="form-select bg-light" required>
+                                <option value="">Select College</option>
+                                <option value="CICT">CICT</option>
+                                <option value="COE">COE</option>
+                                <option value="COED">COED</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mt-3 mt-md-0">
+                            <label class="form-label text-muted fw-bold">Assigned Program</label>
+                            <select name="assigned_program" class="form-select bg-light" required>
+                                <option value="">Select Program</option>
+                                <option value="WST">WST</option>
+                                <option value="DST">DST</option>
+                                <option value="NST">NST</option>
+                                <option value="BSDS">BSDS</option>
+                            </select>
+                        </div>
+                    </div>
 
-        <p>Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted fw-bold">Academic Rank</label>
+                            <select name="academic_rank" class="form-select bg-light" required>
+                                <option value="">Select Rank</option>
+                                <option value="Instructor I">Instructor I</option>
+                                <option value="Instructor II">Instructor II</option>
+                                <option value="Instructor III">Instructor III</option>
+                                <option value="Assistant Professor I">Assistant Professor I</option>
+                                <option value="Assistant Professor II">Assistant Professor II</option>
+                                <option value="Assistant Professor III">Assistant Professor III</option>
+                                <option value="Assistant Professor IV">Assistant Professor IV</option>
+                                <option value="Associate Professor">Associate Professor</option>
+                                <option value="Professor">Professor</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mt-3 mt-md-0">
+                            <label class="form-label text-muted fw-bold">Employment Status</label>
+                            <select name="employment_status" class="form-select bg-light" required>
+                                <option value="">Select Status</option>
+                                <option value="Regular">Regular</option>
+                                <option value="Part-Time">Part-Time</option>
+                                <option value="Contractual">Contractual</option>
+                                <option value="Temporary">Temporary</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted fw-bold">Designation</label>
+                        <select name="designation" class="form-select bg-light">
+                            <option value="None">None (Standard Faculty)</option>
+                            <option value="Program Chair">Program Chair</option>
+                            <option value="Center Director">Center Director</option>
+                            <option value="Coordinator">Coordinator</option>
+                        </select>
+                        <div class="form-text">Leave as "None" if standard.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted fw-bold">Corporate Email</label>
+                        <input type="email" name="email" class="form-control bg-light" placeholder="juan@neust.edu.ph" required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label text-muted fw-bold">Password</label>
+                        <input type="password" name="password" class="form-control bg-light" placeholder="••••••••" required>
+                        <div class="form-text">Choose a secure password.</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm" style="background-color: #0B3C86; border-color: #0B3C86;">Register Account</button>
+                </form>
+
+                <div class="text-center mt-4 pt-2 border-top">
+                    <p class="text-muted mb-0">Already have an account? <a href="{{ url_for('login') }}" class="text-decoration-none fw-bold" style="color: #0B3C86;">Login here</a></p>
+                </div>
+            </div>
+        </div>
     </div>
-
-</body>
-</html>
-<!-- help -->
+</div>
+{% endblock %}
