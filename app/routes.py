@@ -1,7 +1,7 @@
 from flask import render_template, request, redirect, session, url_for, flash
 from app import app
 from .auth import hash_pass, verify_pass
-from .models import get_db_connection, get_user_by_email, register_user, get_pending_users, update_user_status, open_new_term, get_all_terms, add_master_indicator, get_master_indicators, reset_user_password
+from .models import get_db_connection, get_user_by_email, register_user, get_pending_users, update_user_status, open_new_term, get_all_terms, add_master_indicator, get_master_indicators, reset_user_password, import_previous_term_indicators, edit_master_indicator, delete_master_indicator
 import mysql.connector, time
 from functools import wraps
 import os, subprocess, datetime
@@ -128,7 +128,6 @@ def admin_dashboard():
     
     pending_users = get_pending_users(cursor)
     terms = get_all_terms(cursor)
-    indicators = get_master_indicators(cursor)
     
     # Calculate stats
     cursor.execute("SELECT COUNT(*) FROM tbl_auth_credentials WHERE verification_status = 'APPROVED'")
@@ -144,6 +143,10 @@ def admin_dashboard():
     if active_term and active_term[3]:
         delta = active_term[3] - datetime.date.today()
         days_remaining = delta.days if delta.days > 0 else 0
+        
+    indicators = []
+    if active_term:
+        indicators = get_master_indicators(cursor, active_term[0])
         
     stats = {
         'active_users': active_users,
@@ -211,6 +214,65 @@ def admin_add_indicator():
     finally:
         conn.close()
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/indicators/import', methods=['POST'])
+@admin_required
+def admin_import_indicators():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT term_id FROM tbl_academic_terms WHERE is_active = TRUE")
+        active_term = cursor.fetchone()
+        if not active_term:
+            flash("Action denied. No active Academic Term found.", "danger")
+            return redirect(url_for('admin_dashboard'))
+            
+        success, msg = import_previous_term_indicators(conn, cursor, active_term[0])
+        if success:
+            flash(msg, "success")
+        else:
+            flash(msg, "warning")
+    except Exception as e:
+        flash(f"Error importing indicators: {e}", "danger")
+    finally:
+        conn.close()
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/indicators/edit', methods=['POST'])
+@admin_required
+def admin_edit_indicator():
+    indicator_id = request.form.get('indicator_id')
+    category_name = request.form.get('category_name')
+    description = request.form.get('description')
+    efficiency_type = request.form.get('efficiency_type')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        edit_master_indicator(conn, cursor, indicator_id, category_name, description, efficiency_type)
+        flash("Master Indicator updated successfully.", "success")
+    except Exception as e:
+        flash(f"Error updating indicator: {e}", "danger")
+    finally:
+        conn.close()
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/indicators/delete', methods=['POST'])
+@admin_required
+def admin_delete_indicator():
+    indicator_id = request.form.get('indicator_id')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        delete_master_indicator(conn, cursor, indicator_id)
+        flash("Master Indicator deleted successfully.", "success")
+    except Exception as e:
+        flash(f"Error deleting indicator: {e}", "danger")
+    finally:
+        conn.close()
+    return redirect(url_for('admin_dashboard'))
+
 
 @app.route('/admin/reset_password', methods=['POST'])
 @admin_required

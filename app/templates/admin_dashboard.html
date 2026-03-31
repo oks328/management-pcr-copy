@@ -296,7 +296,16 @@
             <div class="col-md-8">
                 <div class="card shadow-sm border-0">
                     <div class="card-body">
-                        <h5 class="fw-bold text-dark mb-3">Locked Organization Targets</h5>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold text-dark mb-0">Locked Organization Targets</h5>
+                            {% if active_term and not indicators %}
+                            <form action="{{ url_for('admin_import_indicators') }}" method="POST" class="m-0">
+                                <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill fw-bold shadow-sm">
+                                    <i class="bi bi-plus-circle-fill me-1"></i> Import Targets from Previous Term
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
                         <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                             <table class="table table-hover table-sm">
                                 <thead class="table-light sticky-top">
@@ -305,6 +314,7 @@
                                         <th>Category</th>
                                         <th>Description</th>
                                         <th>Efficiency Type</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -314,7 +324,72 @@
                                         <td><span class="badge bg-primary">{{ ind[1] }}</span></td>
                                         <td>{{ ind[2] }}</td>
                                         <td><span class="badge bg-dark">{{ ind[3] }}</span></td>
+                                        <td>
+                                            {% if ind[4] %}
+                                            <span class="badge bg-secondary"><i class="bi bi-lock-fill"></i> Locked (Cascaded)</span>
+                                            {% else %}
+                                            <div class="btn-group btn-group-sm">
+                                                <button type="button" class="btn btn-warning shadow-sm" data-bs-toggle="modal" data-bs-target="#editIndicatorModal{{ ind[0] }}">
+                                                    <i class="bi bi-pencil-square"></i> Edit
+                                                </button>
+                                                <form action="{{ url_for('admin_delete_indicator') }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this target?');">
+                                                    <input type="hidden" name="indicator_id" value="{{ ind[0] }}">
+                                                    <button type="submit" class="btn btn-danger shadow-sm"><i class="bi bi-trash"></i> Delete</button>
+                                                </form>
+                                            </div>
+                                            
+                                            <!-- Edit Modal -->
+                                            <div class="modal fade" id="editIndicatorModal{{ ind[0] }}" tabindex="-1" aria-hidden="true">
+                                                <div class="modal-dialog modal-dialog-centered">
+                                                    <div class="modal-content border-0 shadow">
+                                                        <div class="modal-header bg-light border-bottom-0">
+                                                            <h5 class="modal-title fw-bold text-dark"><i class="bi bi-pencil-square me-2"></i>Edit Indicator</h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        </div>
+                                                        <form action="{{ url_for('admin_edit_indicator') }}" method="POST">
+                                                            <div class="modal-body p-4 text-start">
+                                                                <input type="hidden" name="indicator_id" value="{{ ind[0] }}">
+                                                                <div class="mb-3">
+                                                                    <label class="form-label text-muted fw-bold small">OPCR Category</label>
+                                                                    <select name="category_name" class="form-select" required>
+                                                                        <optgroup label="1. Strategic Priorities (50%)">
+                                                                            <option value="A. Instructions" {% if ind[1] == 'A. Instructions' %}selected{% endif %}>A. Instructions</option>
+                                                                        </optgroup>
+                                                                        <optgroup label="2. Core Functions (40%)">
+                                                                            <option value="A. Research" {% if ind[1] == 'A. Research' %}selected{% endif %}>A. Research</option>
+                                                                            <option value="B. Extension Services / Training / Advisory" {% if ind[1] == 'B. Extension Services / Training / Advisory' %}selected{% endif %}>B. Extension Services / Training / Advisory</option>
+                                                                        </optgroup>
+                                                                        <optgroup label="3. Support Functions (10%)">
+                                                                            <option value="Support Functions" {% if ind[1] == 'Support Functions' %}selected{% endif %}>Support Functions</option>
+                                                                        </optgroup>
+                                                                    </select>
+                                                                </div>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label text-muted fw-bold small">Indicator Description</label>
+                                                                    <textarea name="description" class="form-control" rows="4" required>{{ ind[2] }}</textarea>
+                                                                </div>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label text-muted fw-bold small">Efficiency Grading Type</label>
+                                                                    <select name="efficiency_type" class="form-select border-success" required>
+                                                                        <option value="Quantity-Based" {% if ind[3] == 'Quantity-Based' %}selected{% endif %}>Quantity-Based (Auto-Copied)</option>
+                                                                        <option value="Adjectival" {% if ind[3] == 'Adjectival' %}selected{% endif %}>Adjectival (Manager Graded)</option>
+                                                                        <option value="Client Satisfaction" {% if ind[3] == 'Client Satisfaction' %}selected{% endif %}>Client Satisfaction (Survey)</option>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer bg-light border-top-0">
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                                <button type="submit" class="btn btn-success fw-bold shadow-sm">Save Changes</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        </td>
                                     </tr>
+                                    {% else %}
+                                    <tr><td colspan="5" class="text-center text-muted py-4">No targets locked for the active term yet.</td></tr>
                                     {% endfor %}
                                 </tbody>
                             </table>

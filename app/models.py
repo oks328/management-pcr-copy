@@ -143,15 +143,71 @@ def add_master_indicator(conn, cursor, category_name, description, efficiency_ty
         conn.rollback()
         raise e
 
-def get_master_indicators(cursor):
+def get_master_indicators(cursor, term_id):
     query = """
-        SELECT m.indicator_id, c.category_name, m.indicator_description, m.efficiency_type 
+        SELECT m.indicator_id, c.category_name, m.indicator_description, m.efficiency_type,
+               EXISTS(SELECT 1 FROM tbl_cascaded_quotas q WHERE q.indicator_id = m.indicator_id) AS is_locked
         FROM tbl_master_indicators m
         JOIN tbl_target_categories c ON m.category_id = c.category_id
+        WHERE m.term_id = %s
         ORDER BY c.category_name, m.indicator_id
     """
-    cursor.execute(query)
+    cursor.execute(query, (term_id,))
     return cursor.fetchall()
+
+def import_previous_term_indicators(conn, cursor, active_term_id):
+    try:
+        cursor.execute("SELECT term_id FROM tbl_academic_terms WHERE is_active = FALSE ORDER BY term_id DESC LIMIT 1")
+        prev_term = cursor.fetchone()
+        if not prev_term:
+            return False, "No previous term found to import from."
+        
+        cursor.execute("SELECT category_id, indicator_description, efficiency_type FROM tbl_master_indicators WHERE term_id = %s", (prev_term[0],))
+        prev_indicators = cursor.fetchall()
+        
+        if not prev_indicators:
+            return False, "Previous term has no indicators to import."
+            
+        for ind in prev_indicators:
+            cursor.execute("""
+                INSERT INTO tbl_master_indicators (category_id, indicator_description, efficiency_type, term_id)
+                VALUES (%s, %s, %s, %s)
+            """, (ind[0], ind[1], ind[2], active_term_id))
+            
+        conn.commit()
+        return True, "Previous semester targets successfully imported!"
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+def edit_master_indicator(conn, cursor, indicator_id, category_name, description, efficiency_type):
+    try:
+        cursor.execute("SELECT category_id FROM tbl_target_categories WHERE category_name = %s", (category_name,))
+        cat_result = cursor.fetchone()
+        if not cat_result:
+            cursor.execute("INSERT INTO tbl_target_categories (category_name) VALUES (%s)", (category_name,))
+            category_id = cursor.lastrowid
+        else:
+            category_id = cat_result[0]
+            
+        query = """
+            UPDATE tbl_master_indicators 
+            SET category_id = %s, indicator_description = %s, efficiency_type = %s
+            WHERE indicator_id = %s
+        """
+        cursor.execute(query, (category_id, description, efficiency_type, indicator_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+def delete_master_indicator(conn, cursor, indicator_id):
+    try:
+        cursor.execute("DELETE FROM tbl_master_indicators WHERE indicator_id = %s", (indicator_id,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
 
 def reset_user_password(conn, cursor, emp_id, password_hash):
     try:
