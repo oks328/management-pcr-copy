@@ -76,15 +76,25 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label text-muted fw-bold">Designation</label>
-                        <select name="designation" class="form-select bg-light">
-                            <option value="None">None (Standard Faculty)</option>
-                            <option value="Program Chair">Program Chair</option>
-                            <option value="Center Director">Center Director</option>
-                            <option value="Coordinator">Coordinator</option>
-                        </select>
-                        <div class="form-text">Leave as "None" if standard.</div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted fw-bold">Designation</label>
+                            <select name="designation" class="form-select bg-light">
+                                <option value="None">None (Standard Faculty)</option>
+                                <option value="Program Chair">Program Chair</option>
+                                <option value="Center Director">Center Director</option>
+                                <option value="Coordinator">Coordinator</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mt-3 mt-md-0">
+                            <label class="form-label text-muted fw-bold">Requested System Role</label>
+                            <select name="system_role" class="form-select bg-light" required>
+                                <option value="Faculty">Faculty (Standard)</option>
+                                <option value="Designated">Designated</option>
+                                <option value="Dean">Dean</option>
+                                <option value="Manager">Manager</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="mb-3">

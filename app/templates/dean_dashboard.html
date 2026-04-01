@@ -7,7 +7,8 @@
         <p class="text-muted mb-0">College of Information Technology | Rank: <span class="badge bg-secondary">Professor VI</span></p>
     </div>
     <div class="col-md-4 text-md-end">
-        <button class="btn btn-primary"><i class="bi bi-file-earmark-pdf"></i> Generate Summary of Ratings (VPAA)</button>
+        <a href="{{ url_for('dean_export_dpcr') }}" class="btn btn-success fw-bold mb-2 shadow-sm"><i class="bi bi-file-earmark-excel"></i> Export & Print DPCR</a>
+        <button class="btn btn-primary mb-2"><i class="bi bi-file-earmark-pdf"></i> Generate Summary of Ratings (VPAA)</button>
     </div>
 </div>
 
@@ -45,26 +46,69 @@
                 <h5 class="fw-bold text-dark">Phase 1: Institutional Quota Cascading</h5>
             </div>
             <div class="card-body">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Master Indicator</th>
-                            <th>Category</th>
-                            <th>Total College Target</th>
-                            <th>Assigned to Dept</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Published Research Papers</td>
-                            <td><span class="badge bg-info text-dark">Research</span></td>
-                            <td class="fw-bold">40 Papers</td>
-                            <td>BSIT, BSIS</td>
-                            <td><button class="btn btn-outline-primary btn-sm">Distribute Quota</button></td>
-                        </tr>
-                    </tbody>
-                </table>
+                {% if not active_term %}
+                <div class="alert alert-warning shadow-sm border-0 border-start border-warning border-4 text-dark rounded mb-0">
+                    <strong><i class="bi bi-lock-fill me-2"></i>Dashboard Locked</strong><br>
+                    <span class="small">The administrator has not opened a new academic term.</span>
+                </div>
+                {% else %}
+                <div class="alert alert-info shadow-sm border-0 mb-3 small py-2 rounded">
+                    <strong><i class="bi bi-calendar-check me-1"></i>Active Term Target:</strong> {{ active_term[1] }} ({{ active_term[2] }})
+                </div>
+                <form action="/dean/cascade_targets" method="POST">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle shadow-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Master Indicator</th>
+                                    <th width="10%">WST Program</th>
+                                    <th width="10%">DST Program</th>
+                                    <th width="10%">NST Program</th>
+                                    <th width="10%">BSDS Program</th>
+                                    <th width="10%">RET / Extension</th>
+                                    <th width="11%">College-Wide</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for category_name, category_indicators in grouped_indicators.items() %}
+                                    <tr class="table-secondary">
+                                        <td colspan="7" class="fw-bold text-uppercase text-dark border-bottom border-2">
+                                            <i class="bi bi-folder2-open me-2"></i> {{ category_name }}
+                                        </td>
+                                    </tr>
+                                    
+                                    {% for indicator in category_indicators %}
+                                        <tr>
+                                            <td class="ps-4">
+                                                {{ indicator.indicator_description }}
+                                                <span class="badge bg-dark ms-2">{{ indicator.efficiency_type }}</span>
+                                            </td>
+                                            
+                                            <td><input type="number" name="quota_{{indicator.indicator_id}}_WST" class="form-control form-control-sm shadow-sm fw-bold" min="0" placeholder="0" value="{{ quotas.get((indicator.indicator_id, 'WST'), '') }}"></td>
+                                            <td><input type="number" name="quota_{{indicator.indicator_id}}_DST" class="form-control form-control-sm shadow-sm fw-bold" min="0" placeholder="0" value="{{ quotas.get((indicator.indicator_id, 'DST'), '') }}"></td>
+                                            <td><input type="number" name="quota_{{indicator.indicator_id}}_NST" class="form-control form-control-sm shadow-sm fw-bold" min="0" placeholder="0" value="{{ quotas.get((indicator.indicator_id, 'NST'), '') }}"></td>
+                                            <td><input type="number" name="quota_{{indicator.indicator_id}}_BSDS" class="form-control form-control-sm shadow-sm fw-bold" min="0" placeholder="0" value="{{ quotas.get((indicator.indicator_id, 'BSDS'), '') }}"></td>
+                                            <td><input type="number" name="quota_{{indicator.indicator_id}}_RET" class="form-control form-control-sm text-primary shadow-sm fw-bold" min="0" placeholder="0" value="{{ quotas.get((indicator.indicator_id, 'RET'), '') }}"></td>
+                                            <td><input type="number" name="quota_{{indicator.indicator_id}}_CICT_Shared" class="form-control form-control-sm text-success shadow-sm fw-bold" min="0" placeholder="0" value="{{ quotas.get((indicator.indicator_id, 'CICT_Shared'), '') }}"></td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted py-4">No master indicators found for the active term. Please wait for the Admin to set up targets.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if indicators %}
+                    <div class="text-end mt-3 border-top pt-3">
+                        <button type="submit" class="btn btn-primary fw-bold shadow-sm px-4">
+                            Cascade Institutional Targets <i class="bi bi-arrow-right-circle-fill ms-1"></i>
+                        </button>
+                    </div>
+                    {% endif %}
+                </form>
+                {% endif %}
             </div>
         </div>
     </div>

@@ -1,10 +1,14 @@
-from flask import render_template, request, redirect, session, url_for, flash
+from flask import render_template, request, redirect, session, url_for, flash, send_file
 from app import app
 from .auth import hash_pass, verify_pass
-from .models import get_db_connection, get_user_by_email, register_user, get_pending_users, update_user_status, open_new_term, get_all_terms, add_master_indicator, get_master_indicators, reset_user_password, import_previous_term_indicators, edit_master_indicator, delete_master_indicator
+from .models import get_db_connection, get_user_by_email, register_user, get_pending_users, update_user_status, open_new_term, get_all_terms, add_master_indicator, get_master_indicators, reset_user_password, import_previous_term_indicators, edit_master_indicator, delete_master_indicator, get_cascaded_quotas, cascade_institutional_targets
 import mysql.connector, time
 from functools import wraps
 import os, subprocess, datetime
+
+import openpyxl
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+from io import BytesIO
 
 
 def admin_required(f):
@@ -12,6 +16,15 @@ def admin_required(f):
     def decorated_function(*args, **kwargs):
         if session.get('role') != 'Admin':
             flash("Unauthorized access. Admin privileges required.", "danger")
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def dean_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if session.get('role') != 'Dean':
+            flash("Unauthorized access. Dean privileges required.", "danger")
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -77,6 +90,7 @@ def register():
         employment_status = request.form.get('employment_status', '').strip()
         assigned_program = request.form.get('assigned_program', '').strip()
         designation = request.form.get('designation', '').strip()
+        system_role = request.form.get('system_role', 'Faculty').strip()
         email = request.form.get('email', '').lower().strip()
         password = request.form.get('password', '')
         
@@ -96,7 +110,7 @@ def register():
             
         try:
             cursor = conn.cursor()
-            register_user(conn, cursor, emp_id, first_name, last_name, college, academic_rank, employment_status, assigned_program, designation, email, hashed_pw)
+            register_user(conn, cursor, emp_id, first_name, last_name, college, academic_rank, employment_status, assigned_program, designation, email, hashed_pw, system_role)
             cursor.close()
             conn.close()
             flash("Registration successful. Awaiting Admin approval.", "success")
@@ -330,7 +344,240 @@ def admin_backup_db():
 def faculty_dashboard(): return render_template('faculty_dashboard.html')
 
 @app.route('/dean')
-def dean_dashboard(): return render_template('dean_dashboard.html')
+@dean_required
+def dean_dashboard():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT term_id, academic_year, semester FROM tbl_academic_terms WHERE is_active = TRUE")
+    active_term = cursor.fetchone()
+    
+    indicators = []
+    grouped_indicators = {}
+    quotas = {}
+    if active_term:
+        term_id = active_term[0]
+        indicators = get_master_indicators(cursor, term_id)
+        for row in indicators:
+            cat_name = row[1]
+            if cat_name not in grouped_indicators:
+                grouped_indicators[cat_name] = []
+            grouped_indicators[cat_name].append({
+                'indicator_id': row[0],
+                'indicator_description': row[2],
+                'efficiency_type': row[3]
+            })
+        quotas = get_cascaded_quotas(cursor, term_id)
+        
+    conn.close()
+    return render_template('dean_dashboard.html', active_term=active_term, indicators=indicators, grouped_indicators=grouped_indicators, quotas=quotas)
+
+@app.route('/dean/review_targets', methods=['POST'])
+@dean_required
+def dean_review_targets():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT term_id, academic_year, semester FROM tbl_academic_terms WHERE is_active = TRUE")
+    active_term = cursor.fetchone()
+    
+    if not active_term:
+        conn.close()
+        flash("No active term found.", "warning")
+        return redirect(url_for('dean_dashboard'))
+        
+    term_id = active_term[0]
+    indicators = get_master_indicators(cursor, term_id)
+    indicator_dict = {ind[0]: ind for ind in indicators}
+    
+    review_list = []
+    for key, value in request.form.items():
+        if key.startswith('quota_'):
+            val = str(value).strip()
+            if val and val != "0":
+                parts = key.split('_', 2)
+                if len(parts) == 3:
+                    indicator_id = int(parts[1])
+                    role = parts[2]
+                    
+                    if indicator_id in indicator_dict:
+                        ind = indicator_dict[indicator_id]
+                        review_list.append({
+                            'indicator_id': indicator_id,
+                            'role': role,
+                            'value': int(val),
+                            'category': ind[1],
+                            'description': ind[2]
+                        })
+                        
+    conn.close()
+    
+    if not review_list:
+        flash("No valid quotas entered. Please ensure values are greater than 0.", "warning")
+        return redirect(url_for('dean_dashboard'))
+        
+    return render_template('dean_review_targets.html', active_term=active_term, review_list=review_list)
+
+@app.route('/dean/cascade_targets', methods=['POST'])
+@dean_required
+def dean_cascade_targets():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("SELECT term_id FROM tbl_academic_terms WHERE is_active = TRUE")
+        active_term = cursor.fetchone()
+        
+        if not active_term:
+            flash("No active term found to assign targets for.", "warning")
+            return redirect(url_for('dean_dashboard'))
+            
+        term_id = active_term[0]
+        targets_list = []
+        
+        for key, value in request.form.items():
+            if key.startswith('quota_') and value:
+                val = str(value).strip()
+                if val and val != "0":
+                    parts = key.split('_', 2)
+                    if len(parts) == 3:
+                        indicator_id = int(parts[1])
+                        role = parts[2]
+                        targets_list.append((term_id, indicator_id, int(val), role))
+                        
+        cascade_institutional_targets(conn, cursor, term_id, targets_list)
+        flash("Institutional targets successfully reviewed and cascaded to programs.", "success")
+    except Exception as e:
+        flash(f"Error cascading targets: {str(e)}", "danger")
+    finally:
+        conn.close()
+        
+    return redirect(url_for('dean_dashboard'))
+
+@app.route('/dean/export_dpcr')
+@dean_required
+def dean_export_dpcr():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT term_id, academic_year, semester FROM tbl_academic_terms WHERE is_active = TRUE")
+    active_term = cursor.fetchone()
+    if not active_term:
+        conn.close()
+        flash("No active term found to export.", "warning")
+        return redirect(url_for('dean_dashboard'))
+        
+    term_id = active_term[0]
+    indicators = get_master_indicators(cursor, term_id)
+    quotas = get_cascaded_quotas(cursor, term_id)
+    conn.close()
+    
+    grouped_indicators = {}
+    for row in indicators:
+        cat_name = row[1]
+        if cat_name not in grouped_indicators:
+            grouped_indicators[cat_name] = []
+            
+        qu = {
+            'WST': quotas.get((row[0], 'WST'), 0),
+            'DST': quotas.get((row[0], 'DST'), 0),
+            'NST': quotas.get((row[0], 'NST'), 0),
+            'BSDS': quotas.get((row[0], 'BSDS'), 0),
+            'RET': quotas.get((row[0], 'RET'), 0),
+            'CICT_Shared': quotas.get((row[0], 'CICT_Shared'), 0)
+        }
+        
+        grouped_indicators[cat_name].append({
+            'indicator_description': row[2],
+            'quotas': qu
+        })
+        
+    template_path = os.path.join(app.root_path, 'dpcr_template.xlsx')
+    if not os.path.exists(template_path):
+        flash("DPCR Template not found on server.", "danger")
+        return redirect(url_for('dean_dashboard'))
+        
+    wb = openpyxl.load_workbook(template_path)
+    sheet = wb.active
+    
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+    center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    left_align = Alignment(horizontal='left', vertical='center', wrap_text=True)
+    header_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+    
+    insert_row = 12
+    for r in range(1, 100):
+        cell_a = sheet.cell(row=r, column=1).value
+        cell_b = sheet.cell(row=r, column=2).value
+        
+        if (cell_a and "Total Overall Rating" in str(cell_a)) or \
+           (cell_b and "Total Overall Rating" in str(cell_b)):
+            insert_row = r
+            break
+            
+    for cat_name, items in grouped_indicators.items():
+        sheet.insert_rows(insert_row, amount=1)
+        sheet.merge_cells(start_row=insert_row, start_column=1, end_row=insert_row, end_column=18)
+        
+        cat_cell = sheet.cell(row=insert_row, column=1)
+        cat_cell.value = cat_name
+        cat_cell.font = Font(bold=True)
+        cat_cell.fill = header_fill
+        cat_cell.alignment = left_align
+        cat_cell.border = thin_border
+        
+        insert_row += 1
+        
+        for item in items:
+            sheet.insert_rows(insert_row, amount=1)
+            
+            # Explicitly merge Columns A-D to keep the MFO/PAP column blank but structured
+            sheet.merge_cells(start_row=insert_row, start_column=1, end_row=insert_row, end_column=4)
+            
+            # Explicitly merge Columns E-G for the Success Indicator text!
+            sheet.merge_cells(start_row=insert_row, start_column=5, end_row=insert_row, end_column=7)
+            
+            # Write indicator description to Column E (Index 5)
+            desc_cell = sheet.cell(row=insert_row, column=5)
+            desc_cell.value = item['indicator_description']
+            desc_cell.alignment = left_align
+            
+            # Apply borders to the merged sections
+            for col in range(1, 8):
+                sheet.cell(row=insert_row, column=col).border = thin_border
+                
+            q = item['quotas']
+            cict = q.get('CICT_Shared', 0)
+            
+            # The Column Logic (Shared vs Program)
+            if cict and int(cict) > 0:
+                # Merge Columns I through M (9 to 13)
+                sheet.merge_cells(start_row=insert_row, start_column=9, end_row=insert_row, end_column=13)
+                val_cell = sheet.cell(row=insert_row, column=9)
+                val_cell.value = int(cict)
+                val_cell.alignment = center_align
+                
+                # Apply borders across the merged shared columns
+                for col in range(9, 14):
+                    sheet.cell(row=insert_row, column=col).border = thin_border
+            else:
+                mapping = {9: 'DST', 10: 'WST', 11: 'NST', 12: 'BSDS', 13: 'RET'}
+                for col_idx, key in mapping.items():
+                    val = q.get(key, 0)
+                    if val and int(val) > 0:
+                        c = sheet.cell(row=insert_row, column=col_idx)
+                        c.value = int(val)
+                        c.alignment = center_align
+                        c.border = thin_border
+                        
+            insert_row += 1
+            
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    filename = f"Generated_DPCR_{active_term[1]}_{active_term[2]}.xlsx"
+    return send_file(output, download_name=filename.replace(' ', '_'), as_attachment=True)
 
 @app.route('/manager')
 def manager_dashboard(): return render_template('manager_dashboard.html')

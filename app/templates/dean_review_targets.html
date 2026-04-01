@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+        <h2 class="fw-bold text-primary mb-0" style="color: #0B3C86 !important;"><i class="bi bi-card-checklist me-2"></i>Review Target Distribution</h2>
+        <p class="text-muted">Please confirm your program allocations before saving to the database.</p>
+    </div>
+    <div class="col-md-4 text-md-end">
+        <a href="{{ url_for('dean_dashboard') }}" class="btn btn-outline-secondary shadow-sm"><i class="bi bi-arrow-left-circle me-1"></i> Return to Edit</a>
+    </div>
+</div>
+
+<div class="card shadow border-0">
+    <div class="card-body p-0">
+        <form action="{{ url_for('dean_cascade_targets') }}" method="POST">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Master Indicator</th>
+                            <th>Category</th>
+                            <th>Assigned Program</th>
+                            <th>Quota Allocated</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in review_list %}
+                        <tr>
+                            <td>{{ item.description }}</td>
+                            <td><span class="badge bg-primary">{{ item.category }}</span></td>
+                            <td><span class="badge bg-dark">{{ item.role }} Program</span></td>
+                            <td class="fw-bold text-success fs-5">{{ item.value }}</td>
+                            <input type="hidden" name="quota_{{ item.indicator_id }}_{{ item.role }}" value="{{ item.value }}">
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="p-4 bg-light border-top d-flex justify-content-between align-items-center rounded-bottom">
+                <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Confirming will overwrite your previous allocations for the active term.</span>
+                <button type="submit" class="btn btn-success fw-bold shadow px-5 py-2">
+                    <i class="bi bi-check-circle-fill me-2"></i> Confirm & Cascade Targets
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -37,7 +37,7 @@ def get_user_by_email(cursor, email):
     cursor.execute(query, (email,))
     return cursor.fetchall()
 
-def register_user(conn, cursor, emp_id, first_name, last_name, college, academic_rank, employment_status, assigned_program, designation, email, password_hash):
+def register_user(conn, cursor, emp_id, first_name, last_name, college, academic_rank, employment_status, assigned_program, designation, email, password_hash, system_role='Faculty'):
     try:
         # Step 1: Insert into employee profiles
         query_profile = """
@@ -57,9 +57,9 @@ def register_user(conn, cursor, emp_id, first_name, last_name, college, academic
         # Step 3: Insert into system access
         query_access = """
             INSERT INTO tbl_system_access (emp_id, system_role, account_status)
-            VALUES (%s, 'Faculty', 'Active')
+            VALUES (%s, %s, 'Active')
         """
-        cursor.execute(query_access, (emp_id,))
+        cursor.execute(query_access, (emp_id, system_role))
 
         conn.commit()
     except Exception as e:
@@ -204,6 +204,26 @@ def edit_master_indicator(conn, cursor, indicator_id, category_name, description
 def delete_master_indicator(conn, cursor, indicator_id):
     try:
         cursor.execute("DELETE FROM tbl_master_indicators WHERE indicator_id = %s", (indicator_id,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+def get_cascaded_quotas(cursor, term_id):
+    query = "SELECT indicator_id, assigned_to_role, total_target_value FROM tbl_cascaded_quotas WHERE term_id = %s"
+    cursor.execute(query, (term_id,))
+    rows = cursor.fetchall()
+    quotas = {}
+    for row in rows:
+        quotas[(row[0], row[1])] = row[2]
+    return quotas
+
+def cascade_institutional_targets(conn, cursor, term_id, targets_list):
+    try:
+        cursor.execute("DELETE FROM tbl_cascaded_quotas WHERE term_id = %s", (term_id,))
+        if targets_list:
+            query = "INSERT INTO tbl_cascaded_quotas (term_id, indicator_id, total_target_value, assigned_to_role) VALUES (%s, %s, %s, %s)"
+            cursor.executemany(query, targets_list)
         conn.commit()
     except Exception as e:
         conn.rollback()
